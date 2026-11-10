@@ -1,1 +1,110 @@
-# Render-Pipeline-Tools
+import pandas as pd
+# Convert DD:HH:MM:SS → minutes
+def ddhhmmss_to_minutes(time_str):
+    try:
+        parts = str(time_str).strip().split(':')
+        if len(parts) == 4:
+            dd, hh, mm, ss = map(int, parts)
+            return round(dd * 1440 + hh * 60 + mm + ss / 60, 2)
+        else:
+            return 0
+    except:
+        return 0
+
+def run_analysis():
+    # Update filepath to one that exists
+    filepath = '/shiva/projects/itsupport/Murali_Render/For_Render/Deadline_reports/2026_Job_Report/Nov/Deadline_Report_07_Nov_2026.csv'
+    try:
+        df = pd.read_csv(filepath)
+    except FileNotFoundError:
+        print(f"Error: File not found at {filepath}")
+        return
+    except Exception as e:
+        print(f"An error occurred while reading the file: {e}")
+        return
+
+    # Convert render time to minutes
+    df['Render Time (min)'] = df['Total Task Render Time'].apply(ddhhmmss_to_minutes)
+
+    # Ensure 'Extra Info 6' is string type to avoid errors
+    df['Extra Info 6'] = df['Extra Info 6'].astype(str)
+
+
+    # Overall totals
+    adjusted_job_count = df['Job Name'].notnull().sum() - 1
+    total_render_minutes = round(df['Render Time (min)'].sum(), 2)
+
+    # Dept ≠ IO → Nuke
+    df_nuke = df[df['Department'].str.lower() != 'io']
+    df_nuke = df_nuke[df_nuke['Plugin'].str.contains('Nuke', case=False, na=False)]
+    nuke_job_count = df_nuke['Job Name'].notnull().sum()
+    nuke_render_minutes = round(df_nuke['Render Time (min)'].sum(), 2)
+
+    # CommandLine + Nuke
+    df_cmd_nuke = df[df['Plugin'].str.lower() == 'commandline']
+    df_cmd_nuke = df_cmd_nuke[df_cmd_nuke['Extra Info 6'].str.contains('Nuke', case=False, na=False)]
+    cmd_nuke_job_count = df_cmd_nuke['Job Name'].notnull().sum()
+    cmd_nuke_render_minutes = round(df_cmd_nuke['Render Time (min)'].sum(), 2)
+
+    # Combined Nuke
+    combined_nuke_jobs = nuke_job_count + cmd_nuke_job_count
+    combined_nuke_render_minutes = round(nuke_render_minutes + cmd_nuke_render_minutes, 2)
+
+    # Silhouette
+    df_silhouette = df[df['Plugin'].str.contains('Silhouette', case=False, na=False)]
+    silhouette_job_count = df_silhouette['Job Name'].notnull().sum()
+    silhouette_render_minutes = round(df_silhouette['Render Time (min)'].sum(), 2)
+
+    # Maya or Mayacmd
+    df_maya = df[df['Plugin'].str.contains('Maya|Mayacmd', case=False, na=False)]
+    maya_job_count = df_maya['Job Name'].notnull().sum()
+    maya_render_minutes = round(df_maya['Render Time (min)'].sum(), 2)
+
+
+    # Department = Io
+    df_io = df[df['Department'].str.lower() == 'io']
+    io_job_count = df_io['Job Name'].notnull().sum()
+    io_render_minutes = round(df_io['Render Time (min)'].sum(), 2)
+
+    # Dept ≠ Io → Python
+    df_python = df[df['Department'].str.lower() != 'io']
+    df_python = df_python[df_python['Plugin'].str.lower() == 'python']
+    python_job_count = df_python['Job Name'].notnull().sum()
+    python_render_minutes = round(df_python['Render Time (min)'].sum(), 2)
+
+    # CommandLine + Python
+    df_cmd_python = df[df['Plugin'].str.lower() == 'commandline']
+    df_cmd_python = df_cmd_python[df_cmd_python['Extra Info 6'].str.contains('Python', case=False, na=False)]
+    cmd_python_job_count = df_cmd_python['Job Name'].notnull().sum()
+    cmd_python_render_minutes = round(df_cmd_python['Render Time (min)'].sum(), 2)
+
+    # Combined Python
+    combined_python_jobs = python_job_count + cmd_python_job_count
+    combined_python_render_minutes = round(python_render_minutes + cmd_python_render_minutes, 2)
+
+    # Data for summary table
+    data = [
+        ["Overall Totals", adjusted_job_count, total_render_minutes],
+        ["Dept ≠ IO → Nuke", nuke_job_count, nuke_render_minutes],
+        ["CommandLine + Nuke (Extra Info 6)", cmd_nuke_job_count, cmd_nuke_render_minutes],
+        ["Combined Nuke Totals", combined_nuke_jobs, combined_nuke_render_minutes],
+        ["Silhouette Totals", silhouette_job_count, silhouette_render_minutes],
+        ["Maya or Mayacmd Totals", maya_job_count, maya_render_minutes],
+        ["Department = Io", io_job_count, io_render_minutes],
+        ["Dept ≠ Io → Python", python_job_count, python_render_minutes],
+        ["CommandLine + Python (Extra Info 6)", cmd_python_job_count, cmd_python_render_minutes],
+        ["Combined Python Totals", combined_python_jobs, combined_python_render_minutes],
+        ["Script done by Muralidharan", "", ""],   # footer row
+    ]
+
+    df_display = pd.DataFrame(data, columns=["Category", "Jobs", "Render Time (min)"])
+
+    # Print summary
+    print("\n===== Render Report Summary =====")
+    print(df_display.to_string(index=False))
+
+    # Footer message
+    print("\n== Script done by Muralidharan ==")
+
+# Run
+run_analysis()
